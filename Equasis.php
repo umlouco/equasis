@@ -8,15 +8,17 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Psr7;
 use GuzzleHttp\Exception\RequestException;
 use Symfony\Component\DomCrawler\Crawler;
-use RuntimeException;
+use Exception;
 
 class Equasis {
 
     public $response;
     private $client;
     public $equasis;
-    public $path_proxy; 
-    public $vessle; 
+    public $path_proxy;
+    public $vessle = null;
+    public $output; 
+    public $erros = array(); 
 
     public function scrape($mmsi = null, $imo = null) {
         try {
@@ -32,10 +34,18 @@ class Equasis {
             }
 
             $this->getVessle($imo);
-            $this->vessleData($this->response->getBody()->getContents()); 
-            
+            $html = $this->response->getBody()->getContents();
+            if (strpos($html, 'No result has been found')) {
+                $this->vessle = false;
+            } else {
+                if (strpos($html, 'equasis')) {
+                    $this->vessleData($html);
+                }
+            }
+        } catch (RequestException $e) {
+            $this->errors[] = Psr7\str($e->getRequest());
         } catch (Exception $ex) {
-            
+            $this->erros[] = $ex->getMessage();
         }
     }
 
@@ -50,7 +60,7 @@ class Equasis {
             $this->errors[] = Psr7\str($e->getRequest());
         }
         if ($this->response->getStatusCode() != 200) {
-            throw new RuntimeException($response->getStatusCode());
+            throw new Exception($response->getStatusCode());
         }
     }
 
@@ -85,7 +95,7 @@ class Equasis {
             $this->errors[] = Psr7\str($e->getRequest());
         }
         if ($this->response->getStatusCode() != 200) {
-            throw new RuntimeException($this->response->getStatusCode());
+            throw new Exception($this->response->getStatusCode());
         }
     }
 
@@ -107,12 +117,13 @@ class Equasis {
             $this->errors[] = Psr7\str($e->getRequest());
         }
         if ($this->response->getStatusCode() != 200) {
-            throw new RuntimeException($this->response->getStatusCode());
+            throw new Exception($this->response->getStatusCode());
         }
     }
 
     public function setGuzzle() {
         $proxys = new Proxynpm($this->path_proxy);
+        $proxys->output = $this->output; 
         $proxy = $proxys->getProxy();
         $this->setHeaders();
         $this->client = new Client([
@@ -144,10 +155,13 @@ class Equasis {
                 ]
             ]);
         } catch (RequestException $e) {
-            $this->errors[] = Psr7\str($e->getRequest());
+            $this->errors[] = $e->getMessage();
+        }
+        if(empty($response)){
+            throw new Exception('Login response is empty '); 
         }
         if ($response->getStatusCode() != 200) {
-            throw new RuntimeException($this->response->getStatusCode());
+            throw new Exception('Response not 200 ');
         }
         return $response->getBody()->getContents();
     }
@@ -157,10 +171,10 @@ class Equasis {
         $imo = $crawler->filter('#ShipResultId')->each(function($node, $key) {
             return $node->filter('a')->eq(0)->text();
         });
-        return $imo; 
+        return $imo;
     }
-    
-        function vessleData($html) {
+
+    function vessleData($html) {
         $this->vessle = array();
 
         $html = new \Symfony\Component\DomCrawler\Crawler($html);
@@ -195,7 +209,6 @@ class Equasis {
                 $first = false;
             }
         }
-        
     }
 
 }
