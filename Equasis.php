@@ -17,8 +17,8 @@ class Equasis {
     public $equasis;
     public $path_proxy;
     public $vessle = null;
-    public $output; 
-    public $erros = array(); 
+    public $output;
+    public $erros = array();
 
     public function scrape($mmsi = null, $imo = null) {
         try {
@@ -123,7 +123,7 @@ class Equasis {
 
     public function setGuzzle() {
         $proxys = new Proxynpm($this->path_proxy);
-        $proxys->output = $this->output; 
+        $proxys->output = $this->output;
         $proxy = $proxys->getProxy();
         $this->setHeaders();
         $this->client = new Client([
@@ -157,8 +157,8 @@ class Equasis {
         } catch (RequestException $e) {
             $this->errors[] = $e->getMessage();
         }
-        if(empty($response)){
-            throw new Exception('Login response is empty '); 
+        if (empty($response)) {
+            throw new Exception('Login response is empty ');
         }
         if ($response->getStatusCode() != 200) {
             throw new Exception('Response not 200 ');
@@ -181,14 +181,35 @@ class Equasis {
 
         $this->vessle['nome'] = trim($html->filter('.color-gris-bleu-copyright > b:nth-child(1)')->text());
         $this->vessle['imo'] = trim($html->filter('.color-gris-bleu-copyright > b:nth-child(2)')->text());
-        $this->vessle['bandeira'] = str_replace('(', '', trim($html->filter('.access-body > div:nth-child(1) > div:nth-child(1) > div:nth-child(2) > div:nth-child(4) ')->text()));
-        $this->vessle['bandeira'] = str_replace(')', '', $this->vessle['bandeira']);
-        $this->vessle['callsign'] = str_replace('(', '', trim($html->filter('.access-body > div:nth-child(1) > div:nth-child(1) > div:nth-child(3) > div:nth-child(2) ')->text()));
-        $this->vessle['mmsi'] = str_replace('(', '', trim($html->filter('.access-body > div:nth-child(1) > div:nth-child(1) > div:nth-child(4) > div:nth-child(2) ')->text()));
-        $this->vessle['tonnage'] = str_replace('(', '', trim($html->filter('.access-body > div:nth-child(1) > div:nth-child(1) > div:nth-child(5) > div:nth-child(2) ')->text()));
-        $this->vessle['dwt'] = str_replace('(', '', trim($html->filter('.access-body > div:nth-child(1) > div:nth-child(1) > div:nth-child(6) > div:nth-child(2) ')->text()));
-        $this->vessle['tipo'] = str_replace('(', '', trim($html->filter('.access-body > div:nth-child(1) > div:nth-child(1) > div:nth-child(7) > div:nth-child(2) ')->text()));
-        $this->vessle['year'] = str_replace('(', '', trim($html->filter('.access-body > div:nth-child(1) > div:nth-child(1) > div:nth-child(8) > div:nth-child(2) ')->text()));
+
+        $html->filter('.access-body > div:nth-child(1) > div:nth-child(1) > div')->each(function($v, $k) {
+            $lable = $v->filter('div')->eq(0)->text();
+            switch (true) {
+                case (strpos($lable, 'Flag')):
+                    $this->vessle['bandeira'] = str_replace('(', '', trim($v->filter('div:nth-child(4) ')->text()));
+                    $this->vessle['bandeira'] = str_replace(')', '', $this->vessle['bandeira']);
+                    break;
+                case (strpos($lable, 'Call Sign')):
+                    $this->vessle['callsign'] = str_replace('(', '', trim($v->filter('div:nth-child(2) ')->text()));
+                    break;
+                case (strpos($lable, 'MMSI')):
+                    $this->vessle['mmsi'] = str_replace('(', '', trim($v->filter('div:nth-child(2) ')->text()));
+                    break;
+                case (strpos($lable, 'Gross tonnage')):
+                    $this->vessle['tonnage'] = str_replace('(', '', trim($v->filter('div:nth-child(2) ')->text()));
+                    break;
+                case (strpos($lable, 'dwt')):
+                    $this->vessle['dwt'] = str_replace('(', '', trim($v->filter('div:nth-child(2) ')->text()));
+                    break;
+                case (strpos($lable, 'Type of ship')):
+                    $this->vessle['tipo'] = str_replace('(', '', trim($v->filter('div:nth-child(2) ')->text()));
+                    break;
+                case (strpos($lable, 'Year of build')):
+                    $this->vessle['year'] = str_replace('(', '', trim($v->filter('div:nth-child(2) ')->text()));
+                    break;
+            }
+        });
+
         $armadores = $html->filter("[name='formShipToComp'] > table tr ");
         if (sizeof($armadores) > 1) {
             $first = true;
